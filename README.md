@@ -28,6 +28,8 @@ Before running the simulations, you need to populate the `data/` directory with 
 
 1.  **HG38 Reference Genome**
     *   Download `hg38.fa` and place it in the **root directory** of this project.
+    *   **Download Link:** [UCSC hg38.fa.gz](https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz)
+    *   After downloading, unzip it: `gunzip hg38.fa.gz`
     *   Index it: `samtools faidx hg38.fa` (optional but recommended for speed).
 
 2.  **Human Phenotype Ontology (HPO) Data**
@@ -43,10 +45,22 @@ Before running the simulations, you need to populate the `data/` directory with 
     *   Place it in `data/variant_summary.txt.gz`.
 
 4.  **Custom Haplotype Assemblies** (Required for `map_and_simulate.py`)
-    *   Download the following assemblies and place them in the `data/` directory:
-        *   `GCA_050492415.1_apr041.1_v1_genomic.fna` (Haplotype 1)
-        *   `GCA_050492395.1_apr041.2_v1_genomic.fna` (Haplotype 2)
-    *   These can be obtained from NCBI Datasets.
+    *   Download the following assemblies and place them in the `data/` directory. These are from the NCBI **apr041** dataset.
+    *   **Using NCBI Datasets CLI:**
+        ```bash
+        # Haplotype 1 (GCA_050492415.1)
+        datasets download genome accession GCA_050492415.1 --include genome
+        unzip ncbi_dataset.zip -d data_hap1
+        mv data_hap1/ncbi_dataset/data/GCA_050492415.1/GCA_050492415.1_apr041.1_v1_genomic.fna data/
+
+        # Haplotype 2 (GCA_050492395.1)
+        datasets download genome accession GCA_050492395.1 --include genome
+        unzip ncbi_dataset.zip -d data_hap2
+        mv data_hap2/ncbi_dataset/data/GCA_050492395.1/GCA_050492395.1_apr041.2_v1_genomic.fna data/
+        ```
+    *   The files should be named:
+        *   `data/GCA_050492415.1_apr041.1_v1_genomic.fna`
+        *   `data/GCA_050492395.1_apr041.2_v1_genomic.fna`
 
 ## Usage
 
