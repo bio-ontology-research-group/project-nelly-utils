@@ -1,0 +1,122 @@
+[
+  {
+    "name": "Huntington Disease",
+    "omim_id": "143100",
+    "inheritance": "dominant",
+    "variant": {
+      "chrom": "chr4",
+      "pos": 3076606,
+      "ref": "CAG",
+      "alt": "CAGCAGCAGCAGCAGCAGCAGCAGCAGCAG"
+    },
+    "note": "Updated manually to valid coordinate for HTT expansion."
+  },
+  {
+    "name": "Marfan Syndrome",
+    "omim_id": "154700",
+    "inheritance": "dominant",
+    "variant": {
+      "chrom": "chr9",
+      "pos": 99138006,
+      "ref": "C",
+      "alt": "T"
+    },
+    "note": "Updated from ClinVar reference"
+  },
+  {
+    "name": "Achondroplasia",
+    "omim_id": "100800",
+    "inheritance": "dominant",
+    "variant": {
+      "chrom": "chr4",
+      "pos": 1804392,
+      "ref": "G",
+      "alt": "A"
+    },
+    "note": "Updated from ClinVar reference"
+  },
+  {
+    "name": "Neurofibromatosis Type 1",
+    "omim_id": "162200",
+    "inheritance": "dominant",
+    "variant": {
+      "chrom": "chr17",
+      "pos": 31334933,
+      "ref": "A",
+      "alt": "T"
+    },
+    "note": "Updated from ClinVar reference"
+  },
+  {
+    "name": "Familial Hypercholesterolemia",
+    "omim_id": "143890",
+    "inheritance": "dominant",
+    "variant": {
+      "chrom": "chr1",
+      "pos": 55044016,
+      "ref": "T",
+      "alt": "A"
+    },
+    "note": "Updated from ClinVar reference"
+  },
+  {
+    "name": "Cystic Fibrosis",
+    "omim_id": "219700",
+    "inheritance": "recessive",
+    "variant": {
+      "chrom": "chr7",
+      "pos": 117559548,
+      "ref": "C",
+      "alt": "T"
+    },
+    "note": "Updated from ClinVar reference"
+  },
+  {
+    "name": "Sickle Cell Anemia",
+    "omim_id": "603903",
+    "inheritance": "recessive",
+    "variant": {
+      "chrom": "chr11",
+      "pos": 5227003,
+      "ref": "C",
+      "alt": "T"
+    },
+    "note": "Updated from ClinVar reference"
+  },
+  {
+    "name": "Tay-Sachs Disease",
+    "omim_id": "272800",
+    "inheritance": "recessive",
+    "variant": {
+      "chrom": "chr15",
+      "pos": 72346234,
+      "ref": "C",
+      "alt": "G"
+    },
+    "note": "Updated from ClinVar reference"
+  },
+  {
+    "name": "Phenylketonuria",
+    "omim_id": "261600",
+    "inheritance": "recessive",
+    "variant": {
+      "chrom": "chr12",
+      "pos": 102840399,
+      "ref": "C",
+      "alt": "T"
+    },
+    "note": "Updated from ClinVar reference"
+  },
+  {
+    "name": "Gaucher Disease Type I",
+    "omim_id": "230800",
+    "inheritance": "recessive",
+    "variant": {
+      "chrom": "chr1",
+      "pos": 155235252,
+      "ref": "A",
+      "alt": "G"
+    },
+    "note": "Updated from ClinVar reference"
+  }
+]

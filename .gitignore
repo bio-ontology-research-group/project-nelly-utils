@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# Data Directories
+data/
+output/
+ncbi_dataset/
+
+# Large Data Files
+*.zip
+*.part
+*.gz
+md5sum.txt
+
+# Genome files (exclude by default)
+*.fa
+*.fai
+*.fna
+
+# Exceptions for test data
+!tests/data/*.fa
+!tests/data/*.fai
+!tests/data/*.vcf

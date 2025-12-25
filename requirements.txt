@@ -1,0 +1,5 @@
+pysam
+requests
+phenopackets
+pytest
+pytest-mock
