@@ -30,7 +30,19 @@ Before running the simulations, you need to populate the `data/` directory with 
     *   Download `hg38.fa` and place it in the **root directory** of this project.
     *   Index it: `samtools faidx hg38.fa` (optional but recommended for speed).
 
-2.  **Custom Haplotype Assemblies** (Required for `map_and_simulate.py`)
+2.  **Human Phenotype Ontology (HPO) Data**
+    *   Required for generating Phenopackets.
+    *   Download `phenotype.hpoa` from the HPO project.
+    *   URL: `http://purl.obolibrary.org/obo/hp/hpoa/phenotype.hpoa`
+    *   Place it in `data/phenotype.hpoa`.
+
+3.  **ClinVar Data** (Optional, for auto-updating variants)
+    *   Required if you want to update `config/diseases.json` with real pathogenic variants.
+    *   Download `variant_summary.txt.gz` from NCBI ClinVar.
+    *   URL: `https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz`
+    *   Place it in `data/variant_summary.txt.gz`.
+
+4.  **Custom Haplotype Assemblies** (Required for `map_and_simulate.py`)
     *   Download the following assemblies and place them in the `data/` directory:
         *   `GCA_050492415.1_apr041.1_v1_genomic.fna` (Haplotype 1)
         *   `GCA_050492395.1_apr041.2_v1_genomic.fna` (Haplotype 2)
@@ -50,7 +62,17 @@ python scripts/simulate_batch.py
 *   Reads configuration from `config/diseases.json`.
 *   Generates output in `output/<disease_name>/`.
 
-### 2. Advanced Haplotype-Aware Simulation (`scripts/map_and_simulate.py`)
+### 2. Updating Variants from ClinVar (`scripts/update_config_from_clinvar.py`)
+This script scans the `config/diseases.json` file, looks up the OMIM IDs in the downloaded ClinVar summary, and automatically updates the variant information (chromosome, position, ref, alt) with a known pathogenic variant.
+
+**Command:**
+```bash
+python scripts/update_config_from_clinvar.py
+```
+*   Requires `data/variant_summary.txt.gz`.
+*   Useful for ensuring your config has valid pathogenic variants for the specified diseases.
+
+### 3. Advanced Haplotype-Aware Simulation (`scripts/map_and_simulate.py`)
 This is the **recommended** method for more realistic data. It maps the context of the variant from HG38 to the custom diploid assemblies (Hap1 and Hap2), patches the correct haplotype based on inheritance patterns (dominant vs. recessive), and simulates reads from the specific Region of Interest (ROI).
 
 **Command:**
