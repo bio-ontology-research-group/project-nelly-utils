@@ -1,41 +1,100 @@
-# NCBI Datasets
+# Project Nelly Utils
 
-https://www.ncbi.nlm.nih.gov/datasets
+This repository contains utilities for generating synthetic genomic data with pathogenic variants, specifically designed for Project Nelly. It allows for the creation of simulated NGS reads (FASTQ) and Phenopackets for specific genetic diseases.
 
-This zip archive contains an NCBI Datasets Data Package.
+## Prerequisites
 
-NCBI Datasets Data Packages can include sequence, annotation and other data files, and metadata in one or more data report files.
-Data report files are in JSON Lines format.
+### Software
+1.  **Python 3.8+**
+2.  **ART Read Simulator** (`art_illumina`)
+    *   Used for simulating Illumina sequencing reads.
+    *   Installation (Conda): `conda install bioconda::art`
+    *   Installation (Ubuntu/Debian): `sudo apt-get install art-nextgen-simulation-tools`
+3.  **Minimap2**
+    *   Used for mapping variants from HG38 to custom assemblies (required for `map_and_simulate.py`).
+    *   Installation (Conda): `conda install bioconda::minimap2`
+    *   Installation (Ubuntu/Debian): `sudo apt-get install minimap2`
 
----
-## FAQs
-### Where is the data I requested?
+### Python Dependencies
+Install the required Python packages:
 
-Your data is in the subdirectory `ncbi_dataset/data/` contained within this zip archive.
+```bash
+pip install -r requirements.txt
+```
 
-### I still can't find my data, can you help?
+## Data Setup
 
-We have identified a bug affecting Mac Safari users. When downloading data from the NCBI Datasets web interface, you may see only this README file after the download has completed (while other files appear to be missing).
-As a workaround to prevent this issue from recurring, we recommend disabling automatic zip archive extraction in Safari until Apple releases a bug fix.
-For more information, visit:
-https://www.ncbi.nlm.nih.gov/datasets/docs/reference-docs/mac-zip-bug/
+Before running the simulations, you need to populate the `data/` directory with the necessary reference genomes.
 
-### How do I work with JSON Lines data reports?
+1.  **HG38 Reference Genome**
+    *   Download `hg38.fa` and place it in the **root directory** of this project.
+    *   Index it: `samtools faidx hg38.fa` (optional but recommended for speed).
 
-Visit our JSON Lines data report documentation page:
-https://www.ncbi.nlm.nih.gov/datasets/docs/v2/tutorials/working-with-jsonl-data-reports/
+2.  **Custom Haplotype Assemblies** (Required for `map_and_simulate.py`)
+    *   Download the following assemblies and place them in the `data/` directory:
+        *   `GCA_050492415.1_apr041.1_v1_genomic.fna` (Haplotype 1)
+        *   `GCA_050492395.1_apr041.2_v1_genomic.fna` (Haplotype 2)
+    *   These can be obtained from NCBI Datasets.
 
-### What is NCBI Datasets?
+## Usage
 
-NCBI Datasets is a resource that lets you easily gather data from across NCBI databases. Find and download gene, transcript, protein and genome sequences, annotation and metadata.
+The project provides two main workflows for generating data.
 
-### Where can I find NCBI Datasets documentation?
+### 1. Simple Batch Simulation (`scripts/simulate_batch.py`)
+This script uses `hg38.fa` as the template for all simulations. It patches the specific variants directly into hg38 and simulates reads.
 
-Visit the NCBI Datasets documentation pages:
-https://www.ncbi.nlm.nih.gov/datasets/docs/
+**Command:**
+```bash
+python scripts/simulate_batch.py
+```
+*   Reads configuration from `config/diseases.json`.
+*   Generates output in `output/<disease_name>/`.
 
----
+### 2. Advanced Haplotype-Aware Simulation (`scripts/map_and_simulate.py`)
+This is the **recommended** method for more realistic data. It maps the context of the variant from HG38 to the custom diploid assemblies (Hap1 and Hap2), patches the correct haplotype based on inheritance patterns (dominant vs. recessive), and simulates reads from the specific Region of Interest (ROI).
 
-National Center for Biotechnology Information
-National Library of Medicine
-info@ncbi.nlm.nih.gov
+**Command:**
+```bash
+python scripts/map_and_simulate.py
+```
+*   Requires the GCA assemblies in `data/`.
+*   Extracts only the relevant genomic regions (approx. 20kb around the variant) for simulation to save time and space.
+
+## Configuration
+
+The diseases and variants to be simulated are defined in `config/diseases.json`. You can add more diseases by following the existing format:
+
+```json
+{
+    "name": "Disease Name",
+    "omim_id": "123456",
+    "inheritance": "recessive",
+    "variant": {
+        "chrom": "chr1",
+        "pos": 1234567,
+        "ref": "A",
+        "alt": "T"
+    }
+}
+```
+
+## Output Structure
+
+The output is organized by disease name in the `output/` directory:
+
+```
+output/
+└── <disease_name>/
+    ├── <disease_name>.phenopacket.json  # Standardized phenotype description
+    ├── <disease_name>1.fq               # Simulated Read 1 (FASTQ)
+    ├── <disease_name>2.fq               # Simulated Read 2 (FASTQ)
+    ├── roi_diploid.fa                   # (map_and_simulate only) The specific genomic region used
+    └── ...
+```
+
+## Tools Overview
+
+*   `src/main.py`: The core driver script for single-sample simulation.
+*   `src/genome_patcher.py`: Handles checking reference alleles and applying mutations to FASTA sequences.
+*   `src/read_simulator.py`: A wrapper around `art_illumina`.
+*   `src/phenotype.py`: Generates GA4GH Phenopackets based on OMIM IDs.
