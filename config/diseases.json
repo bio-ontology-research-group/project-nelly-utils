@@ -5,9 +5,9 @@
     "inheritance": "dominant",
     "variant": {
       "chrom": "chr4",
-      "pos": 3076606,
-      "ref": "CAG",
-      "alt": "CAGCAGCAGCAGCAGCAGCAGCAGCAGCAG"
+      "pos": 3071991,
+      "ref": "CTG",
+      "alt": "CTGCTGCTGCTGCTGCTGCTGCTGCTGCTG"
     },
     "note": "Updated manually to valid coordinate for HTT expansion."
   },
