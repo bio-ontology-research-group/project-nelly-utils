@@ -96,6 +96,27 @@ python scripts/map_and_simulate.py
 *   Requires the GCA assemblies in `data/`.
 *   Extracts only the relevant genomic regions (approx. 20kb around the variant) for simulation to save time and space.
 
+### 4. Master Genome Simulation (`scripts/simulate_master_genome.py`)
+This is the most advanced and comprehensive workflow. It generates a **full-genome simulation** for multiple patients (diseases) simultaneously, sharing a common "background" simulation to significantly optimize computation time.
+
+**Workflow:**
+1.  **Preparation**: The script identifies the specific loci for all diseases configured in `config/diseases.json`.
+2.  **Background Simulation**: It simulates reads for the entire genome (using `art_illumina` on Hap1 and Hap2 assemblies), *excluding* the specific disease loci. This "background" data is generated once.
+3.  **Locus Simulation**: For each disease, it simulates the specific regions of interest (ROI). It generates "Wild Type" (WT) reads for samples that don't have the disease and "Mutated" reads for the specific patient sample, respecting the inheritance pattern (dominant vs. recessive).
+4.  **Assembly**: It generates a shell script (`output/master_sim/assemble_samples.sh`) that efficiently concatenates the correct background and locus files for each patient and compresses them.
+
+**Command:**
+```bash
+# Step 1: Generate the simulation parts (This is compute-intensive)
+python scripts/simulate_master_genome.py
+
+# Step 2: Assemble the final samples
+bash output/master_sim/assemble_samples.sh
+```
+*   **Input**: Uses the custom haplotype assemblies in `data/` and `config/diseases.json`.
+*   **Output**: Produces fully simulated, whole-genome FASTQ files (compressed with `gzip` or `bgzip`) for each patient in `output/master_sim/`.
+
+
 ## Configuration
 
 The diseases and variants to be simulated are defined in `config/diseases.json`. You can add more diseases by following the existing format:
