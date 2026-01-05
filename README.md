@@ -107,14 +107,19 @@ This is the most advanced and comprehensive workflow. It generates a **full-geno
 
 **Command:**
 ```bash
-# Step 1: Generate the simulation parts (This is compute-intensive)
+# Step 1: Generate the simulation parts and metadata (This is compute-intensive)
 python scripts/simulate_master_genome.py
 
 # Step 2: Assemble the final samples
 bash output/master_sim/assemble_samples.sh
 ```
 *   **Input**: Uses the custom haplotype assemblies in `data/` and `config/diseases.json`.
-*   **Output**: Produces fully simulated, whole-genome FASTQ files (compressed with `gzip` or `bgzip`) for each patient in `output/master_sim/`.
+*   **Step 1 Outputs**: 
+    *   **Background FASTQs**: `background1.fq` and `background2.fq` containing common genomic data.
+    *   **Locus FASTQs**: `locus_i_wt*.fq` and `locus_i_mut*.fq` containing wild-type and mutated reads for each locus.
+    *   **Phenopackets**: JSON files (e.g., `huntington_disease.phenopacket.json`) for each sample. These files contain standardized metadata, where the **phenotypic features (HPO classes starting with `HP:`)** are located under the `phenotypicFeatures` section.
+    *   **Assembly Script**: `assemble_samples.sh` which links these parts together.
+*   **Final Output**: After Step 2, produces fully simulated, whole-genome FASTQ files (compressed with `gzip` or `bgzip`) for each patient in `output/master_sim/`.
 
 
 ## Configuration

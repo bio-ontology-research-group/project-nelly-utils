@@ -224,11 +224,23 @@ def main():
         f.close()
 
     # 3. Simulate Loci (WT and Mutated)
-    print("Simulating Loci...")
+    print("Simulating Loci and Generating Phenopackets...")
     
+    from phenotype import create_phenopacket
+
     for i, meta in enumerate(disease_metadata):
         if not meta: continue
         
+        # --- NEW: Generate Phenopacket for this disease ---
+        sample_id = meta['name'].lower().replace(" ", "_").replace("'", "")
+        phenopacket_path = os.path.join(OUTPUT_DIR, f"{sample_id}.phenopacket.json")
+        create_phenopacket(
+            omim_id=diseases[i]['omim_id'],
+            sample_id=sample_id,
+            output_phenopacket_path=phenopacket_path
+        )
+        # --------------------------------------------------
+
         # For this disease locus, we generate:
         # 1. WT reads (Hap1 & Hap2) -> For everyone else
         # 2. Mutated reads (Hap1 & Hap2 based on inheritance) -> For this patient
