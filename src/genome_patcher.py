@@ -26,20 +26,12 @@ def patch_genome(fasta_path: str, chrom: str, pos: int, ref: str, alt: str, outp
     # Adjust to 0-based
     pos_0 = pos - 1
 
-    # Identify matching contigs
-    # We look for contigs that contain the chrom name
-    matching_contigs = sorted([c for c in fasta_file.references if chrom in c])
-    
-    # Special handling for exact matches if available
+    # Identify matching contigs — prefer exact match, fall back to prefix match
     if chrom in fasta_file.references:
-        # If the exact chrom name exists, prioritize it (or maybe it's the only one we want?)
-        # For now, let's stick to the substring logic as it handles the 'hap1' suffix case well,
-        # but if we have 'chr4' and 'chr4_hap1', we might get both. 
-        # If the user provides 'chr4', and we have 'chr4' in fasta, we probably want that.
-        if chrom in matching_contigs:
-             # Refine: if we have exact match, maybe we don't want others? 
-             # But the requirement is to handle the hap1/hap2 contigs.
-             pass
+        matching_contigs = [chrom]
+    else:
+        # Fall back to prefix match (e.g., "chr4" matches "chr4_ctg9_hap1")
+        matching_contigs = sorted([c for c in fasta_file.references if c.startswith(chrom + "_") or c == chrom])
 
     if not matching_contigs:
         print(f"Warning: No contigs matching '{chrom}' found in FASTA. Skipping variant.")
@@ -82,8 +74,9 @@ def patch_genome(fasta_path: str, chrom: str, pos: int, ref: str, alt: str, outp
                     print(f"Applied patch to {contig}: {pos} {ref}>{alt}")
 
             f_out.write(f">{contig}\n")
-            f_out.write(seq)
-            f_out.write("\n")
+            # Write sequence with 60-char line wrapping (required for samtools faidx)
+            for i in range(0, len(seq), 60):
+                f_out.write(seq[i:i+60] + "\n")
 
     fasta_file.close()
 

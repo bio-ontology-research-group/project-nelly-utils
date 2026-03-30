@@ -4,31 +4,61 @@ import os
 
 def test_patch_genome_snp(tmp_path):
     """
-    Tests the patch_genome function with a simple SNP.
+    Tests patch_genome with a simple SNP on a single-contig FASTA.
+    Original: ACGTACGTACGTACGTACGT (pos 5 = A)
+    Patch: pos 5, ref=A, alt=T → ACGTTCGTACGTACGTACGT
     """
-    test_data_dir = "tests/data"
-    fasta_path = os.path.join(test_data_dir, "test_genome.fa")
-    vcf_path = os.path.join(test_data_dir, "test_clinvar.vcf")
-    output_fasta_path = tmp_path / "patched.fa"
-    variant_id = "TEST001"
+    fasta_path = "tests/data/test_genome.fa"
+    output_fasta_path = str(tmp_path / "patched.fa")
 
-    # Run the patcher
     patch_genome(
         fasta_path=fasta_path,
-        vcf_path=vcf_path,
-        variant_id=variant_id,
-        output_fasta_path=str(output_fasta_path),
+        chrom="test_contig",
+        pos=5,       # 1-based; 0-based index 4 → 'A'
+        ref="A",
+        alt="T",
+        output_fasta_path=output_fasta_path,
         haplotype='both'
     )
 
-    # Check the output
     with open(output_fasta_path, "r") as f:
         lines = f.readlines()
-        
-    # Should have a header and a sequence line
-    assert len(lines) == 2
-    # The header should be the same
+
     assert lines[0] == ">test_contig\n"
-    # The sequence should be patched
-    expected_sequence = "ACGTGCGTACGTACGTACGT\n"
-    assert lines[1] == expected_sequence
+    # Sequence is written 60 chars/line; 20bp fits on one line
+    full_seq = "".join(l.strip() for l in lines[1:])
+    assert full_seq == "ACGTTCGTACGTACGTACGT"
+
+
+def test_patch_genome_exact_chrom_match(tmp_path):
+    """
+    Ensures exact chromosome name match is used when available,
+    so 'chr1' does not accidentally patch 'chr10' or 'chr11'.
+    """
+    # Build a two-contig FASTA
+    fasta_path = str(tmp_path / "two_contig.fa")
+    with open(fasta_path, "w") as f:
+        f.write(">chr1\n" + "A" * 20 + "\n")
+        f.write(">chr11\n" + "G" * 20 + "\n")
+
+    output_fasta_path = str(tmp_path / "patched.fa")
+    patch_genome(
+        fasta_path=fasta_path,
+        chrom="chr1",
+        pos=1,
+        ref="A",
+        alt="T",
+        output_fasta_path=output_fasta_path,
+    )
+
+    with open(output_fasta_path, "r") as f:
+        content = f.read()
+
+    # chr1 first base should be T
+    lines = content.splitlines()
+    assert lines[0] == ">chr1"
+    chr1_seq = "".join(l for l in lines[1:] if not l.startswith(">")).split(">")[0]
+    # chr11 should be unchanged (all G)
+    chr11_start = content.index(">chr11")
+    chr11_seq = content[chr11_start:].splitlines()[1]
+    assert chr11_seq == "G" * 20

@@ -1,42 +1,32 @@
 import pytest
-import pysam
 import json
+from unittest.mock import patch
 from src.phenotype import create_phenopacket
-import os
+from phenopackets import OntologyClass
+
 
 def test_create_phenopacket(tmp_path):
     """
-    Tests the create_phenopacket function.
+    Tests create_phenopacket with the current API (omim_id, sample_id).
+    Mocks HPOA lookup to avoid dependency on the data file.
     """
-    test_data_dir = "tests/data"
-    vcf_path = os.path.join(test_data_dir, "test_clinvar.vcf")
-    output_phenopacket_path = tmp_path / "phenopacket.json"
+    output_path = str(tmp_path / "phenopacket.json")
     sample_id = "test_sample"
+    omim_id = "143100"
 
-    # Get the variant record from the VCF file
-    vcf_file = pysam.VariantFile(vcf_path)
-    variant_record = None
-    for record in vcf_file.fetch():
-        if record.id == "TEST001":
-            variant_record = record
-            break
-    vcf_file.close()
+    fake_hpo_terms = [OntologyClass(id="HP:0000001", label="All")]
 
-    assert variant_record is not None
+    with patch("src.phenotype.get_hpo_terms_from_local_db", return_value=fake_hpo_terms):
+        create_phenopacket(
+            omim_id=omim_id,
+            sample_id=sample_id,
+            output_phenopacket_path=output_path,
+        )
 
-    # Run the function
-    create_phenopacket(
-        vcf_record=variant_record,
-        sample_id=sample_id,
-        output_phenopacket_path=str(output_phenopacket_path)
-    )
+    with open(output_path) as f:
+        data = json.load(f)
 
-    # Check the output
-    with open(output_phenopacket_path, "r") as f:
-        phenopacket_data = json.load(f)
-
-    assert phenopacket_data['id'] == f"{sample_id}-phenopacket"
-    assert phenopacket_data['subject']['id'] == sample_id
-    assert len(phenopacket_data['phenotypicFeatures']) == 1
-    assert phenopacket_data['phenotypicFeatures'][0]['type']['id'] == 'HP:0000001'
-    assert phenopacket_data['phenotypicFeatures'][0]['type']['label'] == 'All'
+    assert data["id"] == f"{sample_id}-phenopacket"
+    assert data["subject"]["id"] == sample_id
+    assert len(data["phenotypicFeatures"]) == 1
+    assert data["phenotypicFeatures"][0]["type"]["id"] == "HP:0000001"

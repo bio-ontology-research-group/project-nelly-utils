@@ -11,6 +11,9 @@ def reverse_complement(seq):
 
 def simulate_reads_python(fasta_path: str, output_prefix: str, coverage: int, read_length: int, paired_end: bool = True):
     print(f"Using Python fallback simulator for {fasta_path}...")
+    # Ensure .fai index exists (required by pysam.FastaFile)
+    if not os.path.exists(fasta_path + ".fai"):
+        pysam.faidx(fasta_path)
     fasta = pysam.FastaFile(fasta_path)
     total_length = sum(fasta.lengths)
     
@@ -107,7 +110,7 @@ def simulate_reads(fasta_path: str, output_prefix: str, coverage: int, read_leng
         ]
 
         if paired_end:
-            cmd.extend(['-p', '-m', '500', '-s', '10']) # Default mean fragment size and std dev
+            cmd.extend(['-p', '-m', '500', '-s', '50']) # Mean fragment size 500bp, SD 50bp
 
         print(f"Running ART command: {' '.join(cmd)}")
 
