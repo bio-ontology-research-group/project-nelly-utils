@@ -11,7 +11,7 @@ This repository contains utilities for generating synthetic genomic data with pa
     *   Installation (Conda): `conda install bioconda::art`
     *   Installation (Ubuntu/Debian): `sudo apt-get install art-nextgen-simulation-tools`
 3.  **Minimap2**
-    *   Used for mapping variants from HG38 to custom assemblies (required for `map_and_simulate.py`).
+    *   Used for lifting over variant coordinates from hg38 to the haplotype assemblies (required for `haplotype_full_sim.py`).
     *   Installation (Conda): `conda install bioconda::minimap2`
     *   Installation (Ubuntu/Debian): `sudo apt-get install minimap2`
 
@@ -44,7 +44,7 @@ Before running the simulations, you need to populate the `data/` directory with 
     *   URL: `https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz`
     *   Place it in `data/variant_summary.txt.gz`.
 
-4.  **Custom Haplotype Assemblies** (Required for `map_and_simulate.py`)
+4.  **Custom Haplotype Assemblies** (Required for `haplotype_full_sim.py`)
     *   Download the following assemblies and place them in the `data/` directory. These are from the NCBI **apr041** dataset.
     *   **Using NCBI Datasets CLI:**
         ```bash
@@ -64,62 +64,76 @@ Before running the simulations, you need to populate the `data/` directory with 
 
 ## Usage
 
-The project provides two main workflows for generating data.
+> **Algorithm details:** see [`ALGORITHM.md`](ALGORITHM.md) for a full description of
+> the simulation approach, coordinate liftover, strand handling, and resource estimates.
 
-### 1. Simple Batch Simulation (`scripts/simulate_batch.py`)
-This script uses `hg38.fa` as the template for all simulations. It patches the specific variants directly into hg38 and simulates reads.
+### 1. Full Diploid Simulation — canonical workflow (`scripts/haplotype_full_sim.py`)
 
-**Command:**
+This is the **recommended** script. For each disease it:
+
+1. Lifts over the hg38 variant coordinate to each haplotype assembly using minimap2.
+2. Patches the **entire** Hap1 and/or Hap2 assembly (dominant → Hap1 only; recessive → both).
+3. Concatenates the patched assemblies into a diploid FASTA.
+4. Simulates paired-end reads with `art_illumina` from the **full** diploid genome.
+
+Reads originate from the individual's real genome, preserving natural background variation
+as a realistic context for variant calling evaluation.
+
+**Run all diseases (default 15× per haplotype, ≈ 30× diploid):**
+```bash
+python scripts/haplotype_full_sim.py
+```
+
+**Run a single disease at low coverage for a quick test:**
+```bash
+python scripts/haplotype_full_sim.py --disease "sickle cell" --coverage 1
+```
+
+**All options:**
+```
+--disease NAME      Run only this disease (case-insensitive substring match)
+--coverage INT      Coverage per haplotype (default: 15)
+--read-length INT   Read length in bp (default: 150)
+--output-dir DIR    Override output root directory
+--hap1 FASTA        Override Hap1 assembly path
+--hap2 FASTA        Override Hap2 assembly path
+--hg38 FASTA        Override hg38 path
+```
+
+*   Requires `hg38.fa`, the GCA haplotype assemblies in `data/`, and `minimap2` in PATH.
+*   Output per disease in `output/<disease_name>/`.
+
+### 2. Simple hg38 Batch Simulation (`scripts/simulate_batch.py`)
+
+Patches variants directly into hg38 and simulates reads from hg38. Useful for quick
+checks that do not require the individual's diploid assemblies.
+
 ```bash
 python scripts/simulate_batch.py
 ```
-*   Reads configuration from `config/diseases.json`.
-*   Generates output in `output/<disease_name>/`.
 
-### 2. Updating Variants from ClinVar (`scripts/update_config_from_clinvar.py`)
-This script scans the `config/diseases.json` file, looks up the OMIM IDs in the downloaded ClinVar summary, and automatically updates the variant information (chromosome, position, ref, alt) with a known pathogenic variant.
+*   Reads `config/diseases.json`; outputs to `output/<disease_name>/`.
+*   Does **not** preserve the individual's background variation.
 
-**Command:**
+### 3. Updating Variants from ClinVar (`scripts/update_config_from_clinvar.py`)
+
+Looks up OMIM IDs in the local ClinVar summary and updates variant coordinates in
+`config/diseases.json`.
+
 ```bash
 python scripts/update_config_from_clinvar.py
 ```
+
 *   Requires `data/variant_summary.txt.gz`.
-*   Useful for ensuring your config has valid pathogenic variants for the specified diseases.
 
-### 3. Advanced Haplotype-Aware Simulation (`scripts/map_and_simulate.py`)
-This is the **recommended** method for more realistic data. It maps the context of the variant from HG38 to the custom diploid assemblies (Hap1 and Hap2), patches the correct haplotype based on inheritance patterns (dominant vs. recessive), and simulates reads from the specific Region of Interest (ROI).
+### Deprecated scripts
 
-**Command:**
-```bash
-python scripts/map_and_simulate.py
-```
-*   Requires the GCA assemblies in `data/`.
-*   Extracts only the relevant genomic regions (approx. 20kb around the variant) for simulation to save time and space.
+| Script | Reason deprecated |
+|--------|------------------|
+| `scripts/map_and_simulate.py` | Simulates reads from a 20 kb ROI only — reads cannot seed correctly against a full-genome aligner or pangenome |
+| `scripts/simulate_master_genome.py` | Complex background+locus approach, superseded by `haplotype_full_sim.py` |
 
-### 4. Master Genome Simulation (`scripts/simulate_master_genome.py`)
-This is the most advanced and comprehensive workflow. It generates a **full-genome simulation** for multiple patients (diseases) simultaneously, sharing a common "background" simulation to significantly optimize computation time.
-
-**Workflow:**
-1.  **Preparation**: The script identifies the specific loci for all diseases configured in `config/diseases.json`.
-2.  **Background Simulation**: It simulates reads for the entire genome (using `art_illumina` on Hap1 and Hap2 assemblies), *excluding* the specific disease loci. This "background" data is generated once.
-3.  **Locus Simulation**: For each disease, it simulates the specific regions of interest (ROI). It generates "Wild Type" (WT) reads for samples that don't have the disease and "Mutated" reads for the specific patient sample, respecting the inheritance pattern (dominant vs. recessive).
-4.  **Assembly**: It generates a shell script (`output/master_sim/assemble_samples.sh`) that efficiently concatenates the correct background and locus files for each patient and compresses them.
-
-**Command:**
-```bash
-# Step 1: Generate the simulation parts and metadata (This is compute-intensive)
-python scripts/simulate_master_genome.py
-
-# Step 2: Assemble the final samples
-bash output/master_sim/assemble_samples.sh
-```
-*   **Input**: Uses the custom haplotype assemblies in `data/` and `config/diseases.json`.
-*   **Step 1 Outputs**: 
-    *   **Background FASTQs**: `background1.fq` and `background2.fq` containing common genomic data.
-    *   **Locus FASTQs**: `locus_i_wt*.fq` and `locus_i_mut*.fq` containing wild-type and mutated reads for each locus.
-    *   **Phenopackets**: JSON files (e.g., `huntington_disease.phenopacket.json`) for each sample. These files contain standardized metadata, where the **phenotypic features (HPO classes starting with `HP:`)** are located under the `phenotypicFeatures` section.
-    *   **Assembly Script**: `assemble_samples.sh` which links these parts together.
-*   **Final Output**: After Step 2, produces fully simulated, whole-genome FASTQ files (compressed with `gzip` or `bgzip`) for each patient in `output/master_sim/`.
+Do not use the deprecated scripts for alignment benchmarks.
 
 
 ## Configuration
@@ -142,21 +156,21 @@ The diseases and variants to be simulated are defined in `config/diseases.json`.
 
 ## Output Structure
 
-The output is organized by disease name in the `output/` directory:
-
 ```
 output/
 └── <disease_name>/
-    ├── <disease_name>.phenopacket.json  # Standardized phenotype description
-    ├── <disease_name>1.fq               # Simulated Read 1 (FASTQ)
-    ├── <disease_name>2.fq               # Simulated Read 2 (FASTQ)
-    ├── roi_diploid.fa                   # (map_and_simulate only) The specific genomic region used
-    └── ...
+    ├── hap1_patched.fa                  # Full Hap1 assembly with variant applied
+    ├── hap2_patched.fa                  # Full Hap2 assembly with variant applied (recessive)
+    ├── diploid_patched.fa               # Concatenated diploid FASTA (input to ART)
+    ├── <disease_name>_1.fq              # Simulated R1 reads (paired-end)
+    ├── <disease_name>_2.fq              # Simulated R2 reads
+    └── <disease_name>.phenopacket.json  # GA4GH Phenopacket with HPO terms + variant
 ```
 
 ## Tools Overview
 
-*   `src/main.py`: The core driver script for single-sample simulation.
-*   `src/genome_patcher.py`: Handles checking reference alleles and applying mutations to FASTA sequences.
-*   `src/read_simulator.py`: A wrapper around `art_illumina`.
-*   `src/phenotype.py`: Generates GA4GH Phenopackets based on OMIM IDs.
+*   `scripts/haplotype_full_sim.py`: **Canonical simulation script** — full diploid workflow.
+*   `src/genome_patcher.py`: Patches a variant into a full FASTA assembly (exact contig match, 60-char line wrapping).
+*   `src/read_simulator.py`: Wrapper around `art_illumina`; falls back to a pure-Python error-free simulator.
+*   `src/phenotype.py`: Generates GA4GH Phenopackets from OMIM IDs and local `phenotype.hpoa`.
+*   `src/main.py`: CLI entry point for single-sample simulation (used by `simulate_batch.py`).
