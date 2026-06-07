@@ -326,3 +326,60 @@ def test_minimap2_liftover(tmp_path):
     )
     print(f"\n    minimap2 liftover: chr_test:{VARIANT_POS_1} → "
           f"hap_contig:{lifted_pos}  strand={hit['strand']}")
+
+
+@pytest.mark.skipif(not shutil.which('minimap2'), reason='minimap2 not in PATH')
+def test_minimap2_liftover_indel_aware(tmp_path):
+    """
+    Regression guard for the coordinate-drift bug: when the assembly differs
+    from hg38 by an indel UPSTREAM of the variant, the lifted-over position must
+    account for it. A naive linear interpolation (t_start + offset) drifts by the
+    net indel length; the CIGAR walk in liftover_position must not.
+
+    Setup: a 30 kb random (unique) genome as 'hg38'; the assembly is the same
+    genome with DEL_LEN bp DELETED at DEL_POS (well upstream of the variant).
+    The true assembly position of the variant is therefore shifted down by
+    exactly DEL_LEN. The buggy linear value would be off by DEL_LEN.
+    """
+    from haplotype_full_sim import (
+        fetch_hg38_context,
+        map_context_to_assembly,
+        liftover_position,
+    )
+
+    rng = random.Random(1234)
+    ref_seq = ''.join(rng.choice(MOTIFS) for _ in range(GENOME_LEN))
+
+    DEL_POS = 5_000          # 0-based, upstream of the variant at 14500
+    DEL_LEN = 11
+    assert DEL_POS + DEL_LEN < VARIANT_POS_0
+    asm_seq = ref_seq[:DEL_POS] + ref_seq[DEL_POS + DEL_LEN:]
+
+    hg38_fa = str(tmp_path / 'hg38_rand.fa')
+    hap_fa  = str(tmp_path / 'hap_del.fa')
+    write_fasta(hg38_fa, 'chr_test', ref_seq)
+    write_fasta(hap_fa,  'hap_contig', asm_seq)
+
+    context_seq, variant_offset = fetch_hg38_context(
+        hg38_fa, 'chr_test', VARIANT_POS_1, VARIANT_REF, window=15_000
+    )
+    assert variant_offset == VARIANT_POS_0
+
+    hit = map_context_to_assembly(context_seq, hap_fa, str(tmp_path))
+    assert hit is not None, "minimap2 returned no hit."
+    assert hit.get('cigar'), "expected a CIGAR (cg:Z) tag from minimap2 -c."
+
+    lifted_pos = liftover_position(hit, variant_offset)
+    expected = VARIANT_POS_1 - DEL_LEN     # shifted down by the upstream deletion
+    assert lifted_pos == expected, (
+        f"indel-aware liftover = {lifted_pos}, expected {expected} "
+        f"(VARIANT_POS_1={VARIANT_POS_1}, DEL_LEN={DEL_LEN}). hit={hit}"
+    )
+
+    # And confirm the indel actually mattered: the naive linear value is wrong.
+    naive = hit['t_start'] + (variant_offset - hit['q_start']) + 1
+    assert naive != lifted_pos, (
+        "test is not exercising the indel path (naive == corrected)."
+    )
+    print(f"\n    indel-aware liftover: chr_test:{VARIANT_POS_1} → "
+          f"hap_contig:{lifted_pos} (naive would be {naive}, off by {naive - lifted_pos})")
