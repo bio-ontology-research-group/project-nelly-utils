@@ -1,0 +1,34 @@
+# running Marfan Syndrome (fixed) ...
+# running Achondroplasia (fixed) ...
+# running Neurofibromatosis Type 1 (fixed) ...
+# running Familial Hypercholesterolemia (fixed) ...
+# running Cystic Fibrosis (fixed) ...
+# running Sickle Cell Anemia (fixed) ...
+# running Tay-Sachs Disease (fixed) ...
+# running Phenylketonuria (fixed) ...
+# running Gaucher Disease Type I (fixed) ...
+
+==============================================================================
+END-TO-END SIMULATOR VALIDATION  (mode=fixed)
+==============================================================================
+Huntington Disease               SKIP (not a SNP — repeat/indel)
+Marfan Syndrome                  PASS
+                                   position: EXACT (chr9:99138006)   zygosity: HET (want HET) OK
+Achondroplasia                   PASS
+                                   position: EXACT (chr4:1804392)   zygosity: HET (want HET) OK
+Neurofibromatosis Type 1         PASS
+                                   position: EXACT (chr17:31334933)   zygosity: HET (want HET) OK
+Familial Hypercholesterolemia    PASS
+                                   position: EXACT (chr1:55044016)   zygosity: HET (want HET) OK
+Cystic Fibrosis                  PASS
+                                   position: EXACT (chr7:117559548)   zygosity: HOM (want HOM) OK
+Sickle Cell Anemia               PASS
+                                   position: EXACT (chr11:5227003)   zygosity: HOM (want HOM) OK
+Tay-Sachs Disease                PASS
+                                   position: EXACT (chr15:72346234)   zygosity: HOM (want HOM) OK
+Phenylketonuria                  PASS
+                                   position: EXACT (chr12:102840399)   zygosity: HOM (want HOM) OK
+Gaucher Disease Type I           PASS
+                                   position: EXACT (chr1:155235252)   zygosity: HOM (want HOM) OK
+------------------------------------------------------------------------------
+PASS=9  FAIL=0  (SNP diseases tested)

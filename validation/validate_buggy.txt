@@ -1,0 +1,34 @@
+# running Marfan Syndrome (buggy) ...
+# running Achondroplasia (buggy) ...
+# running Neurofibromatosis Type 1 (buggy) ...
+# running Familial Hypercholesterolemia (buggy) ...
+# running Cystic Fibrosis (buggy) ...
+# running Sickle Cell Anemia (buggy) ...
+# running Tay-Sachs Disease (buggy) ...
+# running Phenylketonuria (buggy) ...
+# running Gaucher Disease Type I (buggy) ...
+
+==============================================================================
+END-TO-END SIMULATOR VALIDATION  (mode=buggy)
+==============================================================================
+Huntington Disease               SKIP (not a SNP — repeat/indel)
+Marfan Syndrome                  NO VERDICT
+                                   position: NO exact call at chr9:99138006  => FAIL (offset)
+Achondroplasia                   PASS
+                                   position: EXACT (chr4:1804392)   zygosity: HET (want HET) OK
+Neurofibromatosis Type 1         NO VERDICT
+                                   position: NO exact call at chr17:31334933  => FAIL (offset)
+Familial Hypercholesterolemia    NO VERDICT
+                                   position: NO exact call at chr1:55044016  => FAIL (offset)
+Cystic Fibrosis                  NO VERDICT
+                                   position: NO exact call at chr7:117559548  => FAIL (offset)
+Sickle Cell Anemia               NO VERDICT
+                                   position: NO exact call at chr11:5227003  => FAIL (offset)
+Tay-Sachs Disease                NO VERDICT
+                                   position: NO exact call at chr15:72346234  => FAIL (offset)
+Phenylketonuria                  NO VERDICT
+                                   position: NO exact call at chr12:102840399  => FAIL (offset)
+Gaucher Disease Type I           NO VERDICT
+                                   position: NO exact call at chr1:155235252  => FAIL (offset)
+------------------------------------------------------------------------------
+PASS=1  FAIL=0  (SNP diseases tested)

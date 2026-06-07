@@ -67,7 +67,9 @@ sys.path.insert(0, os.path.join(base_dir, "src"))
 
 from genome_patcher import patch_genome
 from read_simulator import simulate_reads
-from phenotype import create_phenopacket
+# NOTE: `from phenotype import create_phenopacket` is imported lazily inside
+# main() so the coordinate-liftover helpers remain importable (and unit-testable)
+# without the optional `phenopackets` dependency installed.
 
 # ---------------------------------------------------------------------------
 # Defaults
@@ -117,12 +119,16 @@ def map_context_to_assembly(context_seq: str, assembly_fasta: str, work_dir: str
     with open(query_fa, "w") as f:
         f.write(">query\n" + context_seq + "\n")
 
-    cmd = ["minimap2", "-x", "asm5", "--secondary=no", assembly_fasta, query_fa]
+    # -c emits the cg:Z CIGAR tag, required so liftover_position can step over
+    # the indels between hg38 and the assembly instead of interpolating across
+    # them (which drifts the coordinate by the net indel length).
+    cmd = ["minimap2", "-c", "-x", "asm5", "--secondary=no", assembly_fasta, query_fa]
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     for line in result.stdout.splitlines():
         parts = line.split("\t")
         if len(parts) >= 9 and parts[0] == "query":
+            cigar = next((t[5:] for t in parts[12:] if t.startswith("cg:Z:")), None)
             return {
                 "contig":  parts[5],
                 "t_start": int(parts[7]),
@@ -130,25 +136,74 @@ def map_context_to_assembly(context_seq: str, assembly_fasta: str, work_dir: str
                 "q_start": int(parts[2]),
                 "q_end":   int(parts[3]),
                 "strand":  parts[4],
+                "cigar":   cigar,
             }
     return None
+
+
+def _parse_cigar(cg: str):
+    ops, num = [], ""
+    for ch in cg:
+        if ch.isdigit():
+            num += ch
+        else:
+            ops.append((int(num), ch)); num = ""
+    return ops
 
 
 def liftover_position(hit: dict, variant_offset: int):
     """
     Convert variant_offset (0-based, within query context) to a 1-based
-    position on the assembly contig, accounting for strand.
+    position on the assembly contig, accounting for strand AND indels.
     Returns None if the variant offset falls outside the aligned region.
+
+    Walks the minimap2 CIGAR rather than interpolating linearly: linear
+    interpolation (t_start + offset) is wrong by the net indel length between
+    q_start and the variant, planting variants tens of bp off-target.
     """
     if hit is None:
         return None
     if not (hit["q_start"] <= variant_offset < hit["q_end"]):
         return None
-    delta = variant_offset - hit["q_start"]
+
+    cigar = hit.get("cigar")
+    if not cigar:
+        # Fallback: linear (only correct for gapless alignments).
+        delta = variant_offset - hit["q_start"]
+        if hit["strand"] == "+":
+            return hit["t_start"] + delta + 1
+        return hit["t_end"] - delta
+
+    ops = _parse_cigar(cigar)
+    t = hit["t_start"]  # 0-based target cursor
     if hit["strand"] == "+":
-        return hit["t_start"] + delta + 1          # 1-based
+        q = hit["q_start"]
+        for length, op in ops:
+            if op in ("M", "=", "X"):
+                if q + length > variant_offset:
+                    return t + (variant_offset - q) + 1
+                q += length; t += length
+            elif op == "I":
+                if q + length > variant_offset:
+                    return t + 1
+                q += length
+            elif op in ("D", "N"):
+                t += length
+        return None
     else:
-        return hit["t_end"] - delta                # 1-based (reverse strand)
+        q = hit["q_end"]
+        for length, op in ops:
+            if op in ("M", "=", "X"):
+                if q - length <= variant_offset:
+                    return t + (q - variant_offset - 1) + 1
+                q -= length; t += length
+            elif op == "I":
+                if q - length <= variant_offset:
+                    return t + 1
+                q -= length
+            elif op in ("D", "N"):
+                t += length
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -258,6 +313,7 @@ def run_disease(d: dict, args):
     # Phenopacket
     # ------------------------------------------------------------------
     pp_path = os.path.join(sample_dir, f"{sample_id}.phenopacket.json")
+    from phenotype import create_phenopacket  # lazy: see import note at top
     create_phenopacket(
         omim_id=d["omim_id"],
         sample_id=sample_id,

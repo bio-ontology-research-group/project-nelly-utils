@@ -50,48 +50,96 @@ def map_sequence(sequence, target_fasta):
         f.write(">query\n")
         f.write(sequence + "\n")
     
-    cmd = ["minimap2", "-x", "asm5", "--secondary=no", target_fasta, query_path]
+    # -c emits the cg:Z CIGAR tag, required to translate coordinates across the
+    # indels that distinguish the assembly from hg38 (see calculate_target_pos).
+    cmd = ["minimap2", "-c", "-x", "asm5", "--secondary=no", target_fasta, query_path]
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    
+
     best_hit = None
     for line in result.stdout.strip().split("\n"):
         if not line: continue
         parts = line.split("\t")
         if parts[0] == "query":
             best_hit = parts
-            break 
-            
+            break
+
     if not best_hit: return None
-        
+
+    cigar = next((t[5:] for t in best_hit[12:] if t.startswith("cg:Z:")), None)
     return {
         "contig": best_hit[5],
         "t_start": int(best_hit[7]),
         "t_end": int(best_hit[8]),
         "q_start": int(best_hit[2]),
         "q_end": int(best_hit[3]),
-        "strand": best_hit[4]
+        "strand": best_hit[4],
+        "cigar": cigar,
     }
+
+
+def _parse_cigar(cg):
+    ops, num = [], ""
+    for ch in cg:
+        if ch.isdigit():
+            num += ch
+        else:
+            ops.append((int(num), ch)); num = ""
+    return ops
 
 def calculate_target_pos(mapping, variant_offset):
     """
-    Calculates the 1-based target position for the variant.
+    Calculates the 1-based target position for the variant by walking the
+    minimap2 CIGAR, so insertions/deletions between the assembly and hg38 do
+    not drift the coordinate. (A plain linear interpolation t_start +
+    (offset - q_start) is wrong by the net indel length between q_start and the
+    variant -- this previously planted variants up to tens of bp off, and
+    differently on each haplotype, splitting homozygous variants into two
+    heterozygous calls.)
     """
     if not mapping: return None
     if not (mapping['q_start'] <= variant_offset <= mapping['q_end']):
         return None
 
-    offset_in_mapping = variant_offset - mapping['q_start']
-    
+    cigar = mapping.get('cigar')
+    if not cigar:
+        # Fallback: linear interpolation (only correct for gapless alignments).
+        offset_in_mapping = variant_offset - mapping['q_start']
+        if mapping['strand'] == '+':
+            return mapping['t_start'] + offset_in_mapping + 1
+        return mapping['t_end'] - offset_in_mapping
+
+    ops = _parse_cigar(cigar)
+    t = mapping['t_start']  # 0-based target cursor
     if mapping['strand'] == '+':
-        target_pos_0 = mapping['t_start'] + offset_in_mapping
-        return target_pos_0 + 1 
+        q = mapping['q_start']
+        for length, op in ops:
+            if op in ('M', '=', 'X'):
+                if q + length > variant_offset:
+                    return t + (variant_offset - q) + 1
+                q += length; t += length
+            elif op == 'I':                 # query-only (insertion vs target)
+                if q + length > variant_offset:
+                    return t + 1            # inside an insertion -> collapse onto target
+                q += length
+            elif op in ('D', 'N'):          # target-only (deletion vs target)
+                t += length
+        return None
     else:
-        # Reverse strand:
-        # q_start (low index) matches t_end (high index)
-        # offset increases from q_start
-        # so target pos decreases from t_end
-        target_pos_0 = mapping['t_end'] - offset_in_mapping - 1
-        return target_pos_0 + 1
+        # Reverse strand: target walks forward from t_start while the query
+        # walks DOWN from q_end.
+        q = mapping['q_end']
+        for length, op in ops:
+            if op in ('M', '=', 'X'):
+                if q - length <= variant_offset:
+                    return t + (q - variant_offset - 1) + 1
+                q -= length; t += length
+            elif op == 'I':
+                if q - length <= variant_offset:
+                    return t + 1
+                q -= length
+            elif op in ('D', 'N'):
+                t += length
+        return None
 
 def rc(seq):
     complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N', 

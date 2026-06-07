@@ -41,33 +41,81 @@ def map_sequence(sequence, target_fasta):
         f.write(">query\n")
         f.write(sequence + "\n")
     
-    cmd = ["minimap2", "-x", "asm5", "--secondary=no", target_fasta, query_path]
+    # -c emits the cg:Z CIGAR tag (needed for indel-aware coordinate mapping).
+    cmd = ["minimap2", "-c", "-x", "asm5", "--secondary=no", target_fasta, query_path]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0: return None
-    
+
     for line in result.stdout.strip().split("\n"):
         if not line: continue
         parts = line.split("\t")
         if parts[0] == "query":
+            cigar = next((t[5:] for t in parts[12:] if t.startswith("cg:Z:")), None)
             return {
                 "contig": parts[5],
                 "t_start": int(parts[7]),
                 "t_end": int(parts[8]),
                 "q_start": int(parts[2]),
                 "q_end": int(parts[3]),
-                "strand": parts[4]
+                "strand": parts[4],
+                "cigar": cigar,
             }
     return None
 
+def _parse_cigar(cg):
+    ops, num = [], ""
+    for ch in cg:
+        if ch.isdigit():
+            num += ch
+        else:
+            ops.append((int(num), ch)); num = ""
+    return ops
+
 def calculate_target_pos(mapping, variant_offset):
-    # Same helper
+    # Walk the CIGAR so indels between the assembly and hg38 don't drift the
+    # coordinate. Linear interpolation (t_start + offset) is wrong by the net
+    # indel length and differs per haplotype, splitting homozygous variants
+    # into two heterozygous calls. See scripts/map_and_simulate.py for details.
     if not mapping: return None
     if not (mapping['q_start'] <= variant_offset <= mapping['q_end']): return None
-    offset = variant_offset - mapping['q_start']
+
+    cigar = mapping.get('cigar')
+    if not cigar:
+        offset = variant_offset - mapping['q_start']
+        if mapping['strand'] == '+':
+            return mapping['t_start'] + offset + 1
+        return mapping['t_end'] - offset
+
+    ops = _parse_cigar(cigar)
+    t = mapping['t_start']
     if mapping['strand'] == '+':
-        return mapping['t_start'] + offset + 1
+        q = mapping['q_start']
+        for length, op in ops:
+            if op in ('M', '=', 'X'):
+                if q + length > variant_offset:
+                    return t + (variant_offset - q) + 1
+                q += length; t += length
+            elif op == 'I':
+                if q + length > variant_offset:
+                    return t + 1
+                q += length
+            elif op in ('D', 'N'):
+                t += length
+        return None
     else:
-        return mapping['t_end'] - offset 
+        q = mapping['q_end']
+        for length, op in ops:
+            if op in ('M', '=', 'X'):
+                if q - length <= variant_offset:
+                    return t + (q - variant_offset - 1) + 1
+                q -= length; t += length
+            elif op == 'I':
+                if q - length <= variant_offset:
+                    return t + 1
+                q -= length
+            elif op in ('D', 'N'):
+                t += length
+        return None
 
 def rc(seq):
     complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N', 'a': 't', 'c': 'g', 'g': 'c', 't': 'a', 'n': 'n'}
